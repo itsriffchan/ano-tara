@@ -8,8 +8,8 @@ export default async function handler(req, res) {
     // Only allow these EXACT websites. No exceptions.
     const allowedOrigins = [
       'http://localhost:5173', // For local development
-      'https://ano-tara-kz4es5jzu-itsriffchans-projects.vercel.app', // Your exact Vercel deployment
-      'https://ano-tara.ochre.vercel.app' // Your production Vercel deployment
+      'https://ano-tara-kz4es5jzu-itsriffchans-projects.vercel.app', 
+      'https://ano-tara-ochre.vercel.app', // Your actual production URL
     ];
 
     if (!allowedOrigins.includes(origin)) {
