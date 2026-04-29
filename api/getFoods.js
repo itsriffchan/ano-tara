@@ -13,7 +13,8 @@ export default async function handler(req, res) {
     ];
 
     if (!allowedOrigins.includes(origin)) {
-      return res.status(403).json({ error: 'Forbidden: Unauthorized host' });
+      console.error(`Unauthorized origin: ${origin}`);
+      return res.status(403).json({ error: `Forbidden: Unauthorized host (${origin})` });
     }
 
     // Set headers to allow the request for authorized origins
