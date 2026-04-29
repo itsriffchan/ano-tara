@@ -197,7 +197,8 @@ function App() {
       const response = await fetch(`/api/getFoods?budget=${encodeURIComponent(budgetRange)}`);
       
       if (!response.ok) {
-        throw new Error('API request failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`API request failed: ${errorData.error || response.statusText || response.status}`);
       }
 
       const newFoods = await response.json();
