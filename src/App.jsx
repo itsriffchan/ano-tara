@@ -102,6 +102,7 @@ function App() {
   const [position, setPosition] = useState(0);
   const [selectedFood, setSelectedFood] = useState(null);
   const [autoSpin, setAutoSpin] = useState(false);
+  const [showMap, setShowMap] = useState(false);
 
   const transitionRef = useRef("none");
   const itemsRef = useRef(null);
@@ -181,6 +182,7 @@ function App() {
     setSpinning(true);
     spinningRef.current = true;
     setDecided(false);
+    setShowMap(false);
 
     // Increased spin duration to 6 seconds to give the AI plenty of time
     transitionRef.current = "transform 6s cubic-bezier(0.1, 0.7, 0.1, 1)";
@@ -230,8 +232,7 @@ function App() {
 
   const handleTaraClick = () => {
     if (selectedFood) {
-      const query = encodeURIComponent(`${selectedFood.search} near me`);
-      window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
+      setShowMap(true);
     }
   };
 
@@ -289,7 +290,7 @@ function App() {
         </div>
       </div>
 
-      <div className={`tara-btn-wrapper ${decided ? 'visible' : ''}`}>
+      <div className={`tara-btn-wrapper ${decided && !showMap ? 'visible' : ''}`}>
         <button
           className="tara-btn"
           onClick={handleTaraClick}
@@ -303,6 +304,22 @@ function App() {
           ayoko nyan 💀
         </button>
       </div>
+
+      {showMap && selectedFood && (
+        <div className="map-modal" onClick={() => setShowMap(false)}>
+          <div className="map-container" onClick={(e) => e.stopPropagation()}>
+            <button className="close-map-btn" onClick={() => setShowMap(false)}>✕</button>
+            <iframe 
+              title="Google Maps"
+              className="gmaps-iframe"
+              width="100%" 
+              height="100%" 
+              src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedFood.search + ' near me')}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+              allowFullScreen
+            ></iframe>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
