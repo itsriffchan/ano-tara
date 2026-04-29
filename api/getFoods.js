@@ -3,21 +3,23 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export default async function handler(req, res) {
   // --- Security & CORS Restriction ---
   const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
-  
+
   if (origin) {
-    // Regex allows http://localhost or http://localhost:PORT
-    const isLocalhost = /^https?:\/\/localhost(:\d+)?$/.test(origin);
-    const isAllowedVercel = origin.startsWith('https://ano-tara') && origin.endsWith('.vercel.app');
-    
-    // Allow any localhost port OR your specific Vercel preview/production deployments
-    if (!isLocalhost && !isAllowedVercel) {
+    // Only allow these EXACT websites. No exceptions.
+    const allowedOrigins = [
+      'http://localhost:5173', // For local development
+      'https://ano-tara-kz4es5jzu-itsriffchans-projects.vercel.app', // Your exact Vercel deployment
+      'https://ano-tara.ochre.vercel.app' // Your production Vercel deployment
+    ];
+
+    if (!allowedOrigins.includes(origin)) {
       return res.status(403).json({ error: 'Forbidden: Unauthorized host' });
     }
-    
+
     // Set headers to allow the request for authorized origins
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    
+
     // If it's a preflight CORS check, respond immediately
     if (req.method === 'OPTIONS') {
       return res.status(200).end();
@@ -35,6 +37,8 @@ export default async function handler(req, res) {
     // Access the secure API key from Vercel's backend environment variables
     const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
+    console.log("Using API Key (first 10 chars):", apiKey ? apiKey.substring(0, 10) : "NOT SET");
+
     if (!apiKey) {
       return res.status(500).json({ error: 'API key not configured on Vercel backend' });
     }
@@ -42,31 +46,74 @@ export default async function handler(req, res) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const prompt = `
-      You are a highly strict budget food picker for the Philippines.
-      The user's EXACT budget is: ${budget} PHP.
-      
-      CRITICAL RULES:
-      - For "50-100": ONLY suggest extremely cheap street foods, bakeries, or snacks (like Fishball, Kikiam, Kwek Kwek, Taho, Siomai, Pandesal). NO sit-down meals or expensive foods.
-      - For "100-300": Suggest local fast food, budget carinderia meals, or mid-tier trends. 
-      - For "300+": Suggest ONLY premium options like Cafes, K-BBQ, Buffets, or expensive trending foods (like Dubai Chocolate, Wagyu, High-end Matcha). YOU MUST EXCLUDE ALL CHEAP STREET FOODS. Do NOT suggest Isaw, Fishball, or Taho for a 300+ budget.
-      
-      Generate exactly 12 trending or popular food items in the Philippines that STRICTLY obey these rules.
-      Return ONLY a JSON array of objects. Do not include markdown formatting like \`\`\`json.
-      Each object must have exactly two keys:
-      - "display": A short, punchy name (max 15 chars) to display on a slot machine UI.
-      - "search": The formal, specific name to search on Google Maps to find local stores selling it.
-    `;
+    const prompt = `You must respond with ONLY a valid JSON array. No text before or after. No markdown code blocks.
+[
+  {"display": "Food1", "search": "Search1"},
+  {"display": "Food2", "search": "Search2"}
+]
 
+Now, generate exactly 12 trending or popular food items in the Philippines based on this budget: ${budget} PHP.
+
+Budget rules:
+- 50-100 PHP: Only cheap street foods (Fishball, Kikiam, Taho, Siomai, Pandesal)
+- 100-300 PHP: Local fast food and carinderia meals
+- 300+ PHP: Premium options (Cafes, K-BBQ, Buffets, Dubai Chocolate, Wagyu)
+
+Return ONLY the JSON array with no additional text.`;
+
+    console.log("Calling Gemini API...");
     const result = await model.generateContent(prompt);
-    const cleanJson = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
-    const newFoods = JSON.parse(cleanJson);
-
-    if (Array.isArray(newFoods) && newFoods.length >= 2) {
-      return res.status(200).json(newFoods);
-    } else {
-      return res.status(500).json({ error: 'Invalid AI response format' });
+    console.log("Got result object:", !!result);
+    
+    if (!result || !result.response) {
+      return res.status(500).json({ error: 'Empty response from Gemini API' });
     }
+    
+    const rawText = result.response.text();
+    console.log("Raw Gemini response length:", rawText.length);
+    console.log("Raw response:", rawText);
+    
+    if (!rawText || rawText.trim().length === 0) {
+      return res.status(500).json({ error: 'Gemini returned empty response' });
+    }
+    
+    // Extract JSON array from the response
+    let cleanJson = null;
+    
+    // Try to find JSON array
+    const startIdx = rawText.indexOf('[');
+    const endIdx = rawText.lastIndexOf(']');
+    
+    if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+      cleanJson = rawText.substring(startIdx, endIdx + 1).trim();
+    }
+    
+    if (!cleanJson) {
+      console.error("Could not extract JSON. Full response:", rawText);
+      return res.status(500).json({ error: 'No JSON array found in response', fullResponse: rawText });
+    }
+    
+    console.log("Extracted JSON:", cleanJson);
+    
+    let newFoods;
+    try {
+      newFoods = JSON.parse(cleanJson);
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError.message);
+      console.error("Attempted to parse:", cleanJson.substring(0, 200));
+      return res.status(500).json({ error: 'Invalid JSON: ' + parseError.message, attempted: cleanJson.substring(0, 200) });
+    }
+
+    if (!Array.isArray(newFoods)) {
+      return res.status(500).json({ error: 'Parsed JSON is not an array' });
+    }
+
+    if (newFoods.length < 2) {
+      return res.status(500).json({ error: `Got only ${newFoods.length} items, need at least 2` });
+    }
+
+    return res.status(200).json(newFoods);
+    
   } catch (error) {
     console.error("AI Generation Failed:", error);
     return res.status(500).json({ error: error.message || 'Failed to generate foods' });

@@ -8,9 +8,8 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://ano-tara-kz4es5jzu-itsriffchans-projects.vercel.app',
+        target: 'http://localhost:3001',
         changeOrigin: true,
-        secure: true,
       }
     }
   }
