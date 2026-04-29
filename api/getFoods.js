@@ -45,6 +45,6 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error("AI Generation Failed:", error);
-    return res.status(500).json({ error: 'Failed to generate foods' });
+    return res.status(500).json({ error: error.message || 'Failed to generate foods' });
   }
 }
