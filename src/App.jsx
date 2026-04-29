@@ -314,7 +314,7 @@ function App() {
               className="gmaps-iframe"
               width="100%" 
               height="100%" 
-              src={`https://maps.google.com/maps?q=${encodeURIComponent(selectedFood.search + ' near me')}&t=&z=15&ie=UTF8&iwloc=&output=embed`}
+              src={`https://www.google.com/maps/embed/v1/search?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&q=${encodeURIComponent(selectedFood.search + ' near me')}`}
               allowFullScreen
             ></iframe>
           </div>
