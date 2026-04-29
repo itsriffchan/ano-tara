@@ -1,6 +1,30 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 export default async function handler(req, res) {
+  // --- Security & CORS Restriction ---
+  const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+  
+  if (origin) {
+    // Regex allows http://localhost or http://localhost:PORT
+    const isLocalhost = /^https?:\/\/localhost(:\d+)?$/.test(origin);
+    const isAllowedVercel = origin.startsWith('https://ano-tara') && origin.endsWith('.vercel.app');
+    
+    // Allow any localhost port OR your specific Vercel preview/production deployments
+    if (!isLocalhost && !isAllowedVercel) {
+      return res.status(403).json({ error: 'Forbidden: Unauthorized host' });
+    }
+    
+    // Set headers to allow the request for authorized origins
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    
+    // If it's a preflight CORS check, respond immediately
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+  }
+  // -----------------------------------
+
   const { budget } = req.query;
 
   if (!budget) {
