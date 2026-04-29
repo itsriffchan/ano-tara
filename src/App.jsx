@@ -211,28 +211,10 @@ function App() {
 
   const handleTaraClick = () => {
     if (selectedFood) {
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            const query = encodeURIComponent(selectedFood.search);
-            const url = `https://www.google.com/maps/search/?api=1&query=${query}&query_place_id=${lat},${lng}`;
-            window.open(url, '_blank');
-          },
-          (error) => {
-            console.warn("Geolocation failed or denied:", error);
-            const query = encodeURIComponent(selectedFood.search);
-            const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-            window.open(url, '_blank');
-          },
-          { enableHighAccuracy: true, timeout: 5000 }
-        );
-      } else {
-        const query = encodeURIComponent(selectedFood.search);
-        const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-        window.open(url, '_blank');
-      }
+      // Append "near me" to force Google Maps to search locally
+      const query = encodeURIComponent(`${selectedFood.search} near me`);
+      const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+      window.open(url, '_blank');
     }
   };
 

@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     // Access the secure API key from Vercel's backend environment variables
     const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    
+
     if (!apiKey) {
       return res.status(500).json({ error: 'API key not configured on Vercel backend' });
     }
