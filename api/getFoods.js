@@ -1,5 +1,102 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+const FALLBACK_FOODS = {
+  '50-100': [
+    { display: 'Tusok-tusok', search: 'Fishball Kikiam Kwek Kwek' },
+    { display: 'Taho', search: 'Taho' },
+    { display: 'Pandesal', search: 'Pandesal' },
+    { display: 'Siomai', search: 'Siomai' },
+    { display: 'Turon', search: 'Turon' },
+    { display: 'Banana Cue', search: 'Banana Cue' },
+    { display: 'Camote Cue', search: 'Camote Cue' },
+    { display: 'Kwek-Kwek', search: 'Kwek-Kwek' },
+    { display: 'Fishball', search: 'Fishball' },
+    { display: 'Kikiam', search: 'Kikiam' },
+    { display: 'Isaw', search: 'Isaw' },
+    { display: 'Pares', search: 'Pares' },
+  ],
+  '100-300': [
+    { display: 'Ilocos Empanada', search: 'Ilocos Empanada' },
+    { display: 'Overload Hotdog', search: 'Overload Hotdog' },
+    { display: 'Loaded Fries', search: 'Loaded Fries' },
+    { display: 'Milk Tea', search: 'Milk Tea' },
+    { display: 'Takoyaki', search: 'Takoyaki' },
+    { display: 'Korean Corn Dog', search: 'Korean Corn Dog' },
+    { display: 'Mango Graham', search: 'Mango Graham' },
+    { display: 'Ramen', search: 'Ramen' },
+    { display: 'Birria Tacos', search: 'Birria Tacos' },
+    { display: 'Chicken Inasal', search: 'Chicken Inasal' },
+    { display: 'Pork Sisig', search: 'Pork Sisig' },
+    { display: 'Silog Meal', search: 'Tapsilog' },
+  ],
+  '300+': [
+    { display: 'Dubai Chewy Cookie', search: 'Dubai Chewy Cookie' },
+    { display: 'Samgyup', search: 'Samgyupsal' },
+    { display: 'Bingsu', search: 'Bingsu' },
+    { display: 'Matcha', search: 'Matcha Latte' },
+    { display: 'Steak', search: 'Steak' },
+    { display: 'Buffet', search: 'Buffet' },
+    { display: 'Sushi Set', search: 'Sushi Set' },
+    { display: 'Shabu-Shabu', search: 'Shabu-Shabu' },
+    { display: 'Lobster', search: 'Lobster' },
+    { display: 'Truffle Pasta', search: 'Truffle Pasta' },
+    { display: 'Wagyu', search: 'Wagyu' },
+    { display: 'Craft Cafe', search: 'Specialty Coffee Cafe' },
+  ],
+};
+
+function normalizeBudget(budget) {
+  if (budget === '50-100' || budget === '100-300' || budget === '300+') return budget;
+  return '100-300';
+}
+
+function asText(value) {
+  return String(value || '').trim();
+}
+
+function sanitizeFoods(rawFoods) {
+  if (!Array.isArray(rawFoods)) return [];
+
+  const cleaned = [];
+  const seen = new Set();
+
+  for (const entry of rawFoods) {
+    const display = asText(entry?.display).slice(0, 40);
+    const search = asText(entry?.search).slice(0, 80);
+    if (!display || !search) continue;
+
+    const normalizedItem = { display, search };
+
+    const dedupeKey = `${display.toLowerCase()}|${search.toLowerCase()}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    cleaned.push(normalizedItem);
+  }
+
+  return cleaned;
+}
+
+function buildResponseFoods(rawFoods, budget) {
+  const bucket = normalizeBudget(budget);
+  const validated = sanitizeFoods(rawFoods);
+  const fallback = FALLBACK_FOODS[bucket];
+
+  // Fill with fallback if AI output is partial/invalid.
+  const merged = [...validated];
+  const seen = new Set(merged.map((i) => `${i.display.toLowerCase()}|${i.search.toLowerCase()}`));
+
+  for (const item of fallback) {
+    const key = `${item.display.toLowerCase()}|${item.search.toLowerCase()}`;
+    if (!seen.has(key)) {
+      merged.push(item);
+      seen.add(key);
+    }
+    if (merged.length >= 12) break;
+  }
+
+  return merged.slice(0, 12);
+}
+
 export default async function handler(req, res) {
   // --- Security & CORS Restriction ---
   const origin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
@@ -29,6 +126,7 @@ export default async function handler(req, res) {
   // -----------------------------------
 
   const { budget } = req.query;
+  const normalizedBudget = normalizeBudget(budget);
 
   if (!budget) {
     return res.status(400).json({ error: 'Budget is required' });
@@ -41,7 +139,7 @@ export default async function handler(req, res) {
     console.log("Using API Key (first 10 chars):", apiKey ? apiKey.substring(0, 10) : "NOT SET");
 
     if (!apiKey) {
-      return res.status(500).json({ error: 'API key not configured on Vercel backend' });
+      return res.status(200).json(FALLBACK_FOODS[normalizedBudget]);
     }
 
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -53,7 +151,7 @@ export default async function handler(req, res) {
   {"display": "Food2", "search": "Search2"}
 ]
 
-Now, generate exactly 12 trending or popular food items in the Philippines based on this budget: ${budget} PHP.
+Now, generate exactly 12 trending or popular food items in the Philippines based on this budget: ${normalizedBudget} PHP range.
 
 Budget rules:
 - 50-100 PHP: Only cheap street foods (Fishball, Kikiam, Taho, Siomai, Pandesal)
@@ -67,7 +165,7 @@ Return ONLY the JSON array with no additional text.`;
     console.log("Got result object:", !!result);
     
     if (!result || !result.response) {
-      return res.status(500).json({ error: 'Empty response from Gemini API' });
+      return res.status(200).json(FALLBACK_FOODS[normalizedBudget]);
     }
     
     const rawText = result.response.text();
@@ -75,7 +173,7 @@ Return ONLY the JSON array with no additional text.`;
     console.log("Raw response:", rawText);
     
     if (!rawText || rawText.trim().length === 0) {
-      return res.status(500).json({ error: 'Gemini returned empty response' });
+      return res.status(200).json(FALLBACK_FOODS[normalizedBudget]);
     }
     
     // Extract JSON array from the response
@@ -90,8 +188,8 @@ Return ONLY the JSON array with no additional text.`;
     }
     
     if (!cleanJson) {
-      console.error("Could not extract JSON. Full response:", rawText);
-      return res.status(500).json({ error: 'No JSON array found in response', fullResponse: rawText });
+      console.error('Could not extract JSON. Full response:', rawText);
+      return res.status(200).json(FALLBACK_FOODS[normalizedBudget]);
     }
     
     console.log("Extracted JSON:", cleanJson);
@@ -100,23 +198,15 @@ Return ONLY the JSON array with no additional text.`;
     try {
       newFoods = JSON.parse(cleanJson);
     } catch (parseError) {
-      console.error("JSON parse error:", parseError.message);
-      console.error("Attempted to parse:", cleanJson.substring(0, 200));
-      return res.status(500).json({ error: 'Invalid JSON: ' + parseError.message, attempted: cleanJson.substring(0, 200) });
+      console.error('JSON parse error:', parseError.message);
+      return res.status(200).json(FALLBACK_FOODS[normalizedBudget]);
     }
 
-    if (!Array.isArray(newFoods)) {
-      return res.status(500).json({ error: 'Parsed JSON is not an array' });
-    }
-
-    if (newFoods.length < 2) {
-      return res.status(500).json({ error: `Got only ${newFoods.length} items, need at least 2` });
-    }
-
-    return res.status(200).json(newFoods);
+    const responseFoods = buildResponseFoods(newFoods, normalizedBudget);
+    return res.status(200).json(responseFoods);
     
   } catch (error) {
-    console.error("AI Generation Failed:", error);
-    return res.status(500).json({ error: error.message || 'Failed to generate foods' });
+    console.error('AI Generation Failed:', error);
+    return res.status(200).json(FALLBACK_FOODS[normalizedBudget]);
   }
 }

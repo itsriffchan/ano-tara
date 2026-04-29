@@ -20,6 +20,51 @@ const DEFAULT_FOODS = [
   { display: "Taho", search: "Taho" }
 ];
 
+const BUDGET_FOODS = {
+  '50-100': [
+    { display: "Tusok-tusok", search: "Fishball Kikiam Kwek Kwek" },
+    { display: "Taho", search: "Taho" },
+    { display: "Pandesal", search: "Pandesal" },
+    { display: "Siomai", search: "Siomai" },
+    { display: "Turon", search: "Turon" },
+    { display: "Banana Cue", search: "Banana Cue" },
+    { display: "Camote Cue", search: "Camote Cue" },
+    { display: "Kwek-Kwek", search: "Kwek-Kwek" },
+    { display: "Fishball", search: "Fishball" },
+    { display: "Kikiam", search: "Kikiam" },
+    { display: "Isaw", search: "Isaw" },
+    { display: "Pares", search: "Pares" },
+  ],
+  '100-300': [
+    { display: "Ilocos Empanada", search: "Ilocos Empanada" },
+    { display: "Overload Hotdog", search: "Overload Hotdog" },
+    { display: "Loaded Fries", search: "Loaded Fries" },
+    { display: "Milk Tea", search: "Milk Tea" },
+    { display: "Takoyaki", search: "Takoyaki" },
+    { display: "Korean Corn Dog", search: "Korean Corn Dog" },
+    { display: "Mango Graham", search: "Mango Graham" },
+    { display: "Ramen", search: "Ramen" },
+    { display: "Birria Tacos", search: "Birria Tacos" },
+    { display: "Chicken Inasal", search: "Chicken Inasal" },
+    { display: "Pork Sisig", search: "Pork Sisig" },
+    { display: "Silog Meal", search: "Tapsilog" },
+  ],
+  '300+': [
+    { display: "Dubai Chewy Cookie", search: "Dubai Chewy Cookie" },
+    { display: "Samgyup", search: "Samgyupsal" },
+    { display: "Bingsu", search: "Bingsu" },
+    { display: "Matcha", search: "Matcha Latte" },
+    { display: "Steak", search: "Steak" },
+    { display: "Buffet", search: "Buffet" },
+    { display: "Sushi Set", search: "Sushi Set" },
+    { display: "Shabu-Shabu", search: "Shabu-Shabu" },
+    { display: "Lobster", search: "Lobster" },
+    { display: "Truffle Pasta", search: "Truffle Pasta" },
+    { display: "Wagyu", search: "Wagyu" },
+    { display: "Craft Cafe", search: "Specialty Coffee Cafe" },
+  ],
+};
+
 const ITEM_HEIGHT = 120; // Match css .slot-item height
 
 let audioCtx = null;
@@ -143,12 +188,19 @@ function App() {
         setFoodsList(newFoods);
       }
     } catch (error) {
-      console.error("AI Generation Failed. Keeping default foods.", error);
+      console.error("AI Generation Failed. Keeping budget foods.", error);
+      const fallbackFoods = BUDGET_FOODS[budgetRange] || DEFAULT_FOODS;
+      setFoodsList(fallbackFoods);
+      foodsListRef.current = fallbackFoods;
     }
   };
 
   const handleBudgetSubmit = (budgetRange) => {
     initAudio();
+    const immediateFoods = BUDGET_FOODS[budgetRange] || DEFAULT_FOODS;
+    setFoodsList(immediateFoods);
+    foodsListRef.current = immediateFoods;
+
     setAppState('slot-machine');
     setAutoSpin(true);
 
@@ -166,10 +218,10 @@ function App() {
     // Increased spin duration to 6 seconds to give the AI plenty of time
     transitionRef.current = "transform 6s cubic-bezier(0.1, 0.7, 0.1, 1)";
 
-    // Pre-calculate target. Use a fixed length of 12 for the distance calculation
-    // even if foodsList changes length mid-spin, the target distance remains valid.
-    const minSpins = 12 * 12; // increased total spins to match 6 seconds
-    const randomIndex = Math.floor(Math.random() * 12);
+    const spinListLength = Math.max(foodsListRef.current.length, 2);
+    // Keep animation length stable, but use active list length for fairness.
+    const minSpins = spinListLength * 12;
+    const randomIndex = Math.floor(Math.random() * spinListLength);
     const targetIndex = minSpins + randomIndex;
     const targetPosition = targetIndex * ITEM_HEIGHT;
 
